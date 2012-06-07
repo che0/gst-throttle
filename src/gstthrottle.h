@@ -52,34 +52,34 @@ G_BEGIN_DECLS
 
 /* #defines don't like whitespacey bits */
 #define GST_TYPE_THROTTLE \
-  (gst_throttle_get_type())
+	(gst_throttle_get_type())
 #define GST_THROTTLE(obj) \
-  (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_THROTTLE,GstThrottle))
+	(G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_THROTTLE,GstThrottle))
 #define GST_THROTTLE_CLASS(klass) \
-  (G_TYPE_CHECK_CLASS_CAST((klass),GST_TYPE_THROTTLE,GstThrottleClass))
+	(G_TYPE_CHECK_CLASS_CAST((klass), GST_TYPE_THROTTLE,GstThrottleClass))
 #define GST_IS_THROTTLE(obj) \
-  (G_TYPE_CHECK_INSTANCE_TYPE((obj),GST_TYPE_THROTTLE))
+	(G_TYPE_CHECK_INSTANCE_TYPE((obj), GST_TYPE_THROTTLE))
 #define GST_IS_THROTTLE_CLASS(klass) \
-  (G_TYPE_CHECK_CLASS_TYPE((klass),GST_TYPE_THROTTLE))
+	(G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_THROTTLE))
 
-typedef struct _GstThrottle      GstThrottle;
+typedef struct _GstThrottle GstThrottle;
 typedef struct _GstThrottleClass GstThrottleClass;
 
 struct _GstThrottle
 {
-  GstElement element;
+	GstElement element;
 
-  GstPad *sinkpad, *srcpad;
+	GstPad *sinkpad, *srcpad;
 
-  gboolean silent;
+	gboolean silent;
 };
 
 struct _GstThrottleClass 
 {
-  GstElementClass parent_class;
+	GstElementClass parent_class;
 };
 
-GType gst_throttle_get_type (void);
+GType gst_throttle_get_type(void);
 
 G_END_DECLS
 
