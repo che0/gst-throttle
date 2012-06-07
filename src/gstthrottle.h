@@ -68,10 +68,12 @@ typedef struct _GstThrottleClass GstThrottleClass;
 struct _GstThrottle
 {
 	GstElement element;
-
+	
 	GstPad *sinkpad, *srcpad;
-
-	gboolean silent;
+	
+	GstClock * clock;
+	gboolean haveStartTime;
+	GstClockTimeDiff streamStartRealTime;
 };
 
 struct _GstThrottleClass 

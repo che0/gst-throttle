@@ -77,7 +77,6 @@ enum
 enum
 {
 	PROP_0,
-	PROP_SILENT
 };
 
 /* the capabilities of the inputs and outputs.
@@ -100,6 +99,7 @@ GST_BOILERPLATE(GstThrottle, gst_throttle, GstElement, GST_TYPE_ELEMENT);
 
 static void gst_throttle_set_property(GObject * object, guint prop_id, const GValue * value, GParamSpec * pspec);
 static void gst_throttle_get_property(GObject * object, guint prop_id, GValue * value, GParamSpec * pspec);
+static gboolean gst_throttle_set_clock(GstElement *element, GstClock *clock);
 
 static gboolean gst_throttle_set_caps(GstPad * pad, GstCaps * caps);
 static GstFlowReturn gst_throttle_chain(GstPad * pad, GstBuffer * buf);
@@ -132,10 +132,8 @@ static void gst_throttle_class_init(GstThrottleClass * klass)
 
 	gobject_class->set_property = gst_throttle_set_property;
 	gobject_class->get_property = gst_throttle_get_property;
-
-	g_object_class_install_property(gobject_class, PROP_SILENT,
-	g_param_spec_boolean("silent", "Silent", "Produce verbose output?",
-		FALSE, G_PARAM_READWRITE));
+	
+	gstelement_class->set_clock = gst_throttle_set_clock;
 }
 
 /* initialize the new element
@@ -155,7 +153,9 @@ static void gst_throttle_init(GstThrottle * filter, GstThrottleClass * gclass)
 
 	gst_element_add_pad(GST_ELEMENT(filter), filter->sinkpad);
 	gst_element_add_pad(GST_ELEMENT(filter), filter->srcpad);
-	filter->silent = FALSE;
+	
+	filter->clock = NULL;
+	filter->haveStartTime = FALSE;
 }
 
 static void gst_throttle_set_property(GObject * object, guint prop_id, const GValue * value, GParamSpec * pspec)
@@ -163,9 +163,6 @@ static void gst_throttle_set_property(GObject * object, guint prop_id, const GVa
 	GstThrottle *filter = GST_THROTTLE(object);
 
 	switch (prop_id) {
-		case PROP_SILENT:
-			filter->silent = g_value_get_boolean(value);
-		break;
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
 		break;
@@ -177,9 +174,6 @@ static void gst_throttle_get_property(GObject * object, guint prop_id, GValue * 
 	GstThrottle *filter = GST_THROTTLE(object);
 
 	switch (prop_id) {
-		case PROP_SILENT:
-			g_value_set_boolean(value, filter->silent);
-		break;
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
 		break;
@@ -187,6 +181,13 @@ static void gst_throttle_get_property(GObject * object, guint prop_id, GValue * 
 }
 
 /* GstElement vmethod implementations */
+
+static gboolean gst_throttle_set_clock(GstElement *element, GstClock *clock)
+{
+	GstThrottle *filter = GST_THROTTLE(element);
+	filter->clock = clock;
+	return TRUE;
+}
 
 /* this function handles the link with other elements */
 static gboolean gst_throttle_set_caps(GstPad * pad, GstCaps * caps)
@@ -206,16 +207,33 @@ static gboolean gst_throttle_set_caps(GstPad * pad, GstCaps * caps)
  */
 static GstFlowReturn gst_throttle_chain(GstPad * pad, GstBuffer * buf)
 {
-	GstThrottle *filter;
-
-	filter = GST_THROTTLE(GST_OBJECT_PARENT(pad));
-
-	if (filter->silent == FALSE)
+	GstThrottle * filter = GST_THROTTLE(GST_OBJECT_PARENT(pad));
+	if (filter->clock == NULL)
 	{
-		g_print("I'm plugged, therefore I'm in.\n");
+		return gst_pad_push(filter->srcpad, buf);
 	}
-
-	/* just push out the incoming buffer without touching it */
+	
+	GstClockTime realTs = gst_clock_get_time(filter->clock);
+	
+	if (filter->haveStartTime)
+	{
+		GstClockTime expectedRealTs = filter->streamStartRealTime + buf->timestamp;
+		GstClockTimeDiff early = expectedRealTs - realTs;
+		
+		if (early > 0)
+		{
+			//g_print("sleeping for %d\n", early);
+			GstClockID * cid = gst_clock_new_single_shot_id(filter->clock, expectedRealTs);
+			gst_clock_id_wait(cid, NULL);
+			gst_clock_id_unref(cid);
+		}
+	}
+	else
+	{
+		filter->streamStartRealTime = realTs - buf->timestamp;
+		filter->haveStartTime = TRUE;
+	}
+	
 	return gst_pad_push(filter->srcpad, buf);
 }
 

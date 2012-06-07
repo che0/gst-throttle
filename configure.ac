@@ -1,8 +1,8 @@
 dnl required version of autoconf
 AC_PREREQ([2.53])
 
-dnl TODO: fill in your package name and package version here
-AC_INIT([my-plugin-package],[0.10.0])
+dnl fill in your package name and package version here
+AC_INIT([gst-throttle],[0.10.0])
 
 dnl required versions of gstreamer and plugins-base
 GST_REQUIRED=0.10.16
