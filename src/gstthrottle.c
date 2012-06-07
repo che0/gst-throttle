@@ -68,6 +68,7 @@ GST_DEBUG_CATEGORY_STATIC(gst_throttle_debug);
 enum
 {
 	PROP_0,
+	PROP_PRINTONLY,
 };
 
 /* the capabilities of the inputs and outputs.
@@ -125,6 +126,10 @@ static void gst_throttle_class_init(GstThrottleClass * klass)
 	gobject_class->set_property = gst_throttle_set_property;
 	gobject_class->get_property = gst_throttle_get_property;
 	
+	g_object_class_install_property(gobject_class, PROP_PRINTONLY,
+		g_param_spec_boolean("printonly", "Print only", "Do not throttle, just print buffer info", FALSE, G_PARAM_READWRITE)
+	);
+	
 	gstelement_class->set_clock = gst_throttle_set_clock;
 }
 
@@ -148,6 +153,7 @@ static void gst_throttle_init(GstThrottle * filter, GstThrottleClass * gclass)
 	gst_element_add_pad(GST_ELEMENT(filter), filter->sinkpad);
 	gst_element_add_pad(GST_ELEMENT(filter), filter->srcpad);
 	
+	filter->printOnly = FALSE;
 	filter->clock = NULL;
 	filter->haveStartTime = FALSE;
 }
@@ -165,9 +171,13 @@ static gboolean gst_throttle_handle_event(GstPad * pad, GstEvent * event)
 
 static void gst_throttle_set_property(GObject * object, guint prop_id, const GValue * value, GParamSpec * pspec)
 {
-	//GstThrottle *filter = GST_THROTTLE(object);
+	GstThrottle *filter = GST_THROTTLE(object);
 
 	switch (prop_id) {
+		case PROP_PRINTONLY:
+			filter->printOnly = g_value_get_boolean(value);
+		break;
+		
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
 		break;
@@ -176,9 +186,13 @@ static void gst_throttle_set_property(GObject * object, guint prop_id, const GVa
 
 static void gst_throttle_get_property(GObject * object, guint prop_id, GValue * value, GParamSpec * pspec)
 {
-	//GstThrottle *filter = GST_THROTTLE(object);
+	GstThrottle *filter = GST_THROTTLE(object);
 
 	switch (prop_id) {
+		case PROP_PRINTONLY:
+			g_value_set_boolean(value, filter->printOnly);
+		break;
+		
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
 		break;
@@ -213,6 +227,15 @@ static gboolean gst_throttle_set_caps(GstPad * pad, GstCaps * caps)
 static GstFlowReturn gst_throttle_chain(GstPad * pad, GstBuffer * buf)
 {
 	GstThrottle * filter = GST_THROTTLE(GST_OBJECT_PARENT(pad));
+	
+	if (filter->printOnly)
+	{
+		GST_LOG_OBJECT(filter, "ts: %" GST_TIME_FORMAT " %sis forwarded", GST_TIME_ARGS(buf->timestamp), GST_BUFFER_IS_DISCONT(buf) ? "and discontinuity " : "");
+		GstFlowReturn ret = gst_pad_push(filter->srcpad, buf);
+		GST_LOG_OBJECT(filter, "ts: %" GST_TIME_FORMAT " processed with status %d", GST_TIME_ARGS(buf->timestamp), ret);
+		return ret;
+	}
+	
 	if (filter->clock == NULL)
 	{
 		return gst_pad_push(filter->srcpad, buf);
@@ -222,18 +245,20 @@ static GstFlowReturn gst_throttle_chain(GstPad * pad, GstBuffer * buf)
 	
 	if (filter->haveStartTime)
 	{
+		const char * discont = GST_BUFFER_IS_DISCONT(buf) ? " with discotinuity" : "";
+		
 		GstClockTime expectedRealTs = filter->streamStartRealTime + buf->timestamp;
 		gboolean early = realTs < expectedRealTs;
 		if (early)
 		{
 			GstClockID * cid = gst_clock_new_single_shot_id(filter->clock, expectedRealTs);
-			GST_TRACE_OBJECT(filter, "ts: %d sec, waiting for %ld ms", buf->timestamp/1000000000, (expectedRealTs - realTs)/1000000);
+			GST_TRACE_OBJECT(filter, "ts: %" GST_TIME_FORMAT " %s, waiting for %ld ms", GST_TIME_ARGS(buf->timestamp), discont, (expectedRealTs - realTs)/1000000);
 			gst_clock_id_wait(cid, NULL);
 			gst_clock_id_unref(cid);
 		}
 		else
 		{
-			GST_TRACE_OBJECT(filter, "ts: %d sec, pad on time", buf->timestamp/1000000000);
+			GST_TRACE_OBJECT(filter, "ts: %" GST_TIME_FORMAT " %s, pad on time", GST_TIME_ARGS(buf->timestamp), discont);
 		}
 	}
 	else

@@ -69,6 +69,7 @@ struct _GstThrottle
 	
 	GstPad *sinkpad, *srcpad;
 	
+	gboolean printOnly;
 	GstClock * clock;
 	gboolean haveStartTime;
 	GstClockTimeDiff streamStartRealTime;
