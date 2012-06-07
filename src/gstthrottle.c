@@ -67,13 +67,6 @@
 GST_DEBUG_CATEGORY_STATIC(gst_throttle_debug);
 #define GST_CAT_DEFAULT gst_throttle_debug
 
-/* Filter signals and args */
-enum
-{
-	/* FILL ME */
-	LAST_SIGNAL
-};
-
 enum
 {
 	PROP_0,
@@ -101,6 +94,7 @@ static void gst_throttle_set_property(GObject * object, guint prop_id, const GVa
 static void gst_throttle_get_property(GObject * object, guint prop_id, GValue * value, GParamSpec * pspec);
 static gboolean gst_throttle_set_clock(GstElement *element, GstClock *clock);
 
+static gboolean gst_throttle_handle_event(GstPad * pad, GstEvent * event);
 static gboolean gst_throttle_set_caps(GstPad * pad, GstCaps * caps);
 static GstFlowReturn gst_throttle_chain(GstPad * pad, GstBuffer * buf);
 
@@ -144,11 +138,13 @@ static void gst_throttle_class_init(GstThrottleClass * klass)
 static void gst_throttle_init(GstThrottle * filter, GstThrottleClass * gclass)
 {
 	filter->sinkpad = gst_pad_new_from_static_template(&sink_factory, "sink");
+	gst_pad_set_event_function(filter->sinkpad, gst_throttle_handle_event);
 	gst_pad_set_setcaps_function(filter->sinkpad, GST_DEBUG_FUNCPTR(gst_throttle_set_caps));
 	gst_pad_set_getcaps_function(filter->sinkpad, GST_DEBUG_FUNCPTR(gst_pad_proxy_getcaps));
 	gst_pad_set_chain_function(filter->sinkpad, GST_DEBUG_FUNCPTR(gst_throttle_chain));
 
 	filter->srcpad = gst_pad_new_from_static_template(&src_factory, "src");
+	gst_pad_set_event_function(filter->srcpad, gst_throttle_handle_event);
 	gst_pad_set_getcaps_function(filter->srcpad, GST_DEBUG_FUNCPTR(gst_pad_proxy_getcaps));
 
 	gst_element_add_pad(GST_ELEMENT(filter), filter->sinkpad);
@@ -157,6 +153,17 @@ static void gst_throttle_init(GstThrottle * filter, GstThrottleClass * gclass)
 	filter->clock = NULL;
 	filter->haveStartTime = FALSE;
 }
+
+static gboolean gst_throttle_handle_event(GstPad * pad, GstEvent * event)
+{
+	GstThrottle * filter = GST_THROTTLE(gst_pad_get_parent(pad));
+	GST_DEBUG_OBJECT(pad, "passing event %s", GST_EVENT_TYPE_NAME(event));
+	
+	GstPad * otherpad = (pad == filter->srcpad) ? filter->sinkpad : filter->srcpad;
+	gst_object_unref(filter);
+	return gst_pad_push_event(otherpad, event);
+}
+
 
 static void gst_throttle_set_property(GObject * object, guint prop_id, const GValue * value, GParamSpec * pspec)
 {
@@ -222,13 +229,13 @@ static GstFlowReturn gst_throttle_chain(GstPad * pad, GstBuffer * buf)
 		if (early)
 		{
 			GstClockID * cid = gst_clock_new_single_shot_id(filter->clock, expectedRealTs);
-			g_print("buf ts: %d sec, waiting for %ld ms on pad %p\n", buf->timestamp/1000000000, (expectedRealTs - realTs)/1000000, filter->sinkpad);
+			GST_TRACE_OBJECT(filter, "ts: %d sec, waiting for %ld ms", buf->timestamp/1000000000, (expectedRealTs - realTs)/1000000);
 			gst_clock_id_wait(cid, NULL);
 			gst_clock_id_unref(cid);
 		}
 		else
 		{
-			g_print("pad %p okay\n", filter->sinkpad);
+			GST_TRACE_OBJECT(filter, "ts: %d sec, pad on time", buf->timestamp/1000000000);
 		}
 	}
 	else
@@ -247,11 +254,8 @@ static GstFlowReturn gst_throttle_chain(GstPad * pad, GstBuffer * buf)
  */
 static gboolean throttle_init(GstPlugin * throttle)
 {
-	/* debug category for fltering log messages
-	*
-	* exchange the string 'Template throttle' with your description
-	*/
-	GST_DEBUG_CATEGORY_INIT(gst_throttle_debug, "throttle", 0, "Template throttle");
+	// debug category for filtering log messages
+	GST_DEBUG_CATEGORY_INIT(gst_throttle_debug, "throttle", 0, "Throttling filter");
 
 	return gst_element_register(throttle, "throttle", GST_RANK_NONE, GST_TYPE_THROTTLE);
 }
@@ -262,7 +266,7 @@ static gboolean throttle_init(GstPlugin * throttle)
  * compile this code. GST_PLUGIN_DEFINE needs PACKAGE to be defined.
  */
 #ifndef PACKAGE
-#define PACKAGE "myfirstthrottle"
+#define PACKAGE "throttle"
 #endif
 
 // gstreamer looks for this structure to register throttles
@@ -270,7 +274,7 @@ GST_PLUGIN_DEFINE(
 	GST_VERSION_MAJOR,
 	GST_VERSION_MINOR,
 	"throttle",
-	"Filter that throttles pipeline throughput",
+	"Filter that throttles pipeline throughput to real time",
 	throttle_init,
 	VERSION,
 	"LGPL",
