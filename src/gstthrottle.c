@@ -160,7 +160,7 @@ static void gst_throttle_init(GstThrottle * filter, GstThrottleClass * gclass)
 
 static void gst_throttle_set_property(GObject * object, guint prop_id, const GValue * value, GParamSpec * pspec)
 {
-	GstThrottle *filter = GST_THROTTLE(object);
+	//GstThrottle *filter = GST_THROTTLE(object);
 
 	switch (prop_id) {
 		default:
@@ -171,7 +171,7 @@ static void gst_throttle_set_property(GObject * object, guint prop_id, const GVa
 
 static void gst_throttle_get_property(GObject * object, guint prop_id, GValue * value, GParamSpec * pspec)
 {
-	GstThrottle *filter = GST_THROTTLE(object);
+	//GstThrottle *filter = GST_THROTTLE(object);
 
 	switch (prop_id) {
 		default:
@@ -182,7 +182,7 @@ static void gst_throttle_get_property(GObject * object, guint prop_id, GValue * 
 
 /* GstElement vmethod implementations */
 
-static gboolean gst_throttle_set_clock(GstElement *element, GstClock *clock)
+static gboolean gst_throttle_set_clock(GstElement * element, GstClock * clock)
 {
 	GstThrottle *filter = GST_THROTTLE(element);
 	filter->clock = clock;
@@ -218,14 +218,17 @@ static GstFlowReturn gst_throttle_chain(GstPad * pad, GstBuffer * buf)
 	if (filter->haveStartTime)
 	{
 		GstClockTime expectedRealTs = filter->streamStartRealTime + buf->timestamp;
-		GstClockTimeDiff early = expectedRealTs - realTs;
-		
-		if (early > 0)
+		gboolean early = realTs < expectedRealTs;
+		if (early)
 		{
-			//g_print("sleeping for %d\n", early);
 			GstClockID * cid = gst_clock_new_single_shot_id(filter->clock, expectedRealTs);
+			g_print("buf ts: %d sec, waiting for %ld ms on pad %p\n", buf->timestamp/1000000000, (expectedRealTs - realTs)/1000000, filter->sinkpad);
 			gst_clock_id_wait(cid, NULL);
 			gst_clock_id_unref(cid);
+		}
+		else
+		{
+			g_print("pad %p okay\n", filter->sinkpad);
 		}
 	}
 	else
