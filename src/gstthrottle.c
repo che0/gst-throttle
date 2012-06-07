@@ -277,5 +277,5 @@ GST_PLUGIN_DEFINE(
 	VERSION,
 	"LGPL",
 	"Throttle",
-	"http://FIXME/"
+	"https://github.com/che0/gst-throttle"
 )
