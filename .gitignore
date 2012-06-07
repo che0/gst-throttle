@@ -14,3 +14,7 @@ stamp-*
 my-plugin-*.tar.*
 *~
 
+Makefile
+/src/.deps
+/src/.libs
+/src/*.l[ao]
