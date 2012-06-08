@@ -230,9 +230,18 @@ static GstFlowReturn gst_throttle_chain(GstPad * pad, GstBuffer * buf)
 	
 	if (filter->printOnly)
 	{
-		GST_LOG_OBJECT(filter, "ts: %" GST_TIME_FORMAT " %sis forwarded", GST_TIME_ARGS(buf->timestamp), GST_BUFFER_IS_DISCONT(buf) ? "and discontinuity " : "");
+		GstCaps * caps = gst_buffer_get_caps(buf);
+		gchar * capsStr = gst_caps_to_string(caps);
+		gst_caps_unref(caps);
+		GST_LOG_OBJECT(filter, "ts: %" GST_TIME_FORMAT " %sof type %s",
+			GST_TIME_ARGS(buf->timestamp),
+			GST_BUFFER_IS_DISCONT(buf) ? "and discontinuity " : "",
+			capsStr
+		);
+		g_free(capsStr);
+		
 		GstFlowReturn ret = gst_pad_push(filter->srcpad, buf);
-		GST_LOG_OBJECT(filter, "ts: %" GST_TIME_FORMAT " processed with status %d", GST_TIME_ARGS(buf->timestamp), ret);
+		GST_TRACE_OBJECT(filter, "ts: %" GST_TIME_FORMAT " processed with status %d", GST_TIME_ARGS(buf->timestamp), ret);
 		return ret;
 	}
 	
