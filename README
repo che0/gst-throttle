@@ -1,2 +1,9 @@
-This is a gstreamer filter that throttles pipeline throughput to real time. Might
-be useful for emulating live captured video from recorded sources.
+This package contains:
+
+ - throttle filter
+	that can throttle pipeline to real time or print info abount what comes through
+
+ - splitter
+	that divides pipeline stream with both H.264 and AAC buffers to two output pads
+
+It's all badly designed, experimental, etc.
